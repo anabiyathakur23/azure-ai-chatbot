@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # azure-ai-chatbot
 =======
 # Azure AI Chatbot (CLI)
@@ -58,11 +58,6 @@ Type `exit` to quit.
 
 ## Deliverables (for Lab 2)
 - `/docs/architecture/architecture.png` (diagram)
-- `/docs/architecture/architecture.md` (explanation)
 - Working chatbot script in `/chatbot/chatbot.py`
 - Public GitHub repo named **azure-ai-chatbot**
 
-## Notes
-- Do **not** commit any API keys (.env or secrets).
-- If `gpt-4o` is unavailable in your region, deploy `gpt-4` and update `AZURE_DEPLOYMENT_NAME`.
->>>>>>> 169d2e6 (Initial commit)
