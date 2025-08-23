@@ -33,7 +33,7 @@ A diagram illustrating this architecture is available in `assets/architecture.pn
 git clone <your-repo-url>
 cd chatbot-project
 
-### 2. Install dependencies. 
+## 2. Install dependencies.
 pip install -r requirements.txt
 
 ### 2. Set up environment variables. 
