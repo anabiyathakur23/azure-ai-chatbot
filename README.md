@@ -41,3 +41,16 @@ AZURE_OPENAI_KEY=your_azure_key
 AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
 AZURE_DEPLOYMENT_NAME=your_deployment_name
 
+## Repository Structure
+chatbot-project/
+│
+├── README.md             # Project documentation (this file)
+├── requirements.txt      # Python dependencies
+├── .gitignore            # Ignore sensitive files like .env
+├── .env.example          # Example environment variables
+├── app.py                # Main entry point of chatbot
+├── chatbot_logic.py      # Functions for calling GPT-4o API
+└── assets/               # Images, architecture diagram, screenshots
+    └── architecture.png
+
+
