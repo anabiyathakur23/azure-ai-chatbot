@@ -1,7 +1,5 @@
 
-# azure-ai-chatbot
-=======
-# Azure AI Chatbot (CLI)
+# Azure AI Chatbot
 
 A very simple command-line chatbot that uses **Azure OpenAI (GPT-4o)**.
 
