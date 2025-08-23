@@ -32,3 +32,12 @@ A diagram illustrating this architecture is available in `assets/architecture.pn
 ```bash
 git clone <your-repo-url>
 cd chatbot-project
+
+### 2. Install dependencies. 
+pip install -r requirements.txt
+
+### 2. Set up environment variables. 
+AZURE_OPENAI_KEY=your_azure_key
+AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
+AZURE_DEPLOYMENT_NAME=your_deployment_name
+
