@@ -30,7 +30,7 @@ azure-ai-chatbot/
 3. Set environment variables (example):
    - **PowerShell (Windows)**
      ```powershell
-     $env:AZURE_OPENAI_ENDPOINT="[https://<your-resource>.openai.azure.com/](https://anabi-meobtnsg-swedencentral.cognitiveservices.azure.com)"
+     $env:AZURE_OPENAI_ENDPOINT="(https://anabi-meobtnsg-swedencentral.cognitiveservices.azure.com)"
      $env:AZURE_OPENAI_KEY="<my-api-key>"
      $env:AZURE_DEPLOYMENT_NAME="gpt-4o"
      ```
