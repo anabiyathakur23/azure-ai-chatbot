@@ -1,9 +1,8 @@
 from openai import AzureOpenAI
 
 AZURE_OPENAI_KEY = "1jiytLtW3XtSb2eakFpwQwl939kglgu9w5Nw5gF1pLYtDhwzDByHJQQJ99BHACfhMk5XJ3w3AAAAACOGyHV0"
-AZURE_OPENAI_ENDPOINT = "https://anabi-meobtnsg-swedencentral.openai.azure.com"  # no trailing slash
-AZURE_DEPLOYMENT_NAME = "gpt-4o"             # deployment name
-
+AZURE_OPENAI_ENDPOINT = "https://anabi-meobtnsg-swedencentral.openai.azure.com"
+AZURE_DEPLOYMENT_NAME = "gpt-4o"
 client = AzureOpenAI(
     api_key=AZURE_OPENAI_KEY,
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
