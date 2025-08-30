@@ -7,9 +7,7 @@ A very simple command-line chatbot that uses **Azure OpenAI (GPT-4o)**.
 ```
 azure-ai-chatbot/
 ├─ chatbot/
-│  ├─ chatbot.py              # CLI chatbot (Lab 2)
-│  ├─ storage.py              # Session persistence (CosmosDB / Storage)
-│  └─ utils.py                # Helpers (summarization, context mgmt)
+│  ├─ chatbot.py              # CLI chatbot (Lab 3)
 ├─ docs/
 │  └─ architecture/
 │     ├─ architecture_v1.0.png  # Lab 2 architecture
