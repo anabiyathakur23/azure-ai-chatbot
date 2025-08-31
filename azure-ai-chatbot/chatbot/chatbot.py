@@ -31,9 +31,8 @@ kb_container = database.create_container_if_not_exists(
     partition_key=PartitionKey(path="/doc_id")
 )
 
-# -----------------------------
 # Helper functions
-# -----------------------------
+
 def cosine_similarity(vec1, vec2):
     dot = sum(a*b for a, b in zip(vec1, vec2))
     norm1 = math.sqrt(sum(a*a for a in vec1))
@@ -77,19 +76,17 @@ def count_tokens(messages, model="gpt-4o"):
             total_tokens += len(encoding.encode(str(value)))
     return total_tokens
 
-# -----------------------------
 # Start session
-# -----------------------------
 session_id = str(uuid.uuid4())
 print(f"\n✅ New session started: {session_id}")
 print("💬 Chatbot ready! Type 'exit', 'clear', or 'history'.")
 print("⏱️ Current UTC:", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z"))
 
-MAX_TOKENS = 3000  # adjust based on model limits
+MAX_TOKENS = 3000  
 
-# -----------------------------
+
 # Main chat loop
-# -----------------------------
+
 while True:
     user_input = input("You: ")
 
@@ -124,9 +121,8 @@ while True:
         enable_cross_partition_query=True
     ))
 
-    # -----------------------------
     # Build messages with token-based context
-    # -----------------------------
+
     messages = [{"role": "system", "content": "You are a helpful assistant specialized in teaching."}]
     kb_context = retrieve_kb(user_input)
     if kb_context:
@@ -140,7 +136,7 @@ while True:
         temp_tokens = count_tokens(temp_messages, model=AZURE_DEPLOYMENT_NAME)
 
         if temp_tokens > MAX_TOKENS:
-            summary_text = summarize_conversation(messages[1:])  # skip system prompt
+            summary_text = summarize_conversation(messages[1:])  
             messages = [{"role": "system", "content": "Conversation summary:\n" + summary_text}]
             break
         else:
