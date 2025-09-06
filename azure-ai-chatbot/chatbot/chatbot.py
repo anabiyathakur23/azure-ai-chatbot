@@ -1,165 +1,190 @@
-import uuid
-from datetime import datetime, timezone
+
+# chatbot.py
+
+import os
+import faiss
+import numpy as np
+from sentence_transformers import SentenceTransformer
 from openai import AzureOpenAI
-from azure.cosmos import CosmosClient, PartitionKey
-import math
-import tiktoken
+import difflib
 
-AZURE_OPENAI_KEY = "1jiytLtW3XtSb2eakFpwQwl939kglgu9w5Nw5gF1pLYtDhwzDByHJQQJ99BHACfhMk5XJ3w3AAAAACOGyHV0"
-AZURE_OPENAI_ENDPOINT = "https://anabi-meobtnsg-swedencentral.cognitiveservices.azure.com"
-AZURE_DEPLOYMENT_NAME = "gpt-4o"       
-AZURE_EMBEDDINGS_DEPLOYMENT_NAME = "embedding-small"  
+# -----------------------------
+# 0️⃣ Azure OpenAI environment setup
+# -----------------------------
+os.environ["AZURE_OPENAI_API_KEY"] = "1jiytLtW3XtSb2eakFpwQwl939kglgu9w5Nw5gF1pLYtDhwzDByHJQQJ99BHACfhMk5XJ3w3AAAAACOGyHV0"
+os.environ["AZURE_OPENAI_ENDPOINT"] = "https://anabi-meobtnsg-swedencentral.openai.azure.com/"
+os.environ["AZURE_OPENAI_DEPLOYMENT"] = "gpt-4o"
+os.environ["OPENAI_API_VERSION"] = "2023-05-15"
 
-COSMOS_ENDPOINT = "https://chatbot-cosmos1.documents.azure.com:443"
-COSMOS_KEY = "BFSFICHE15c5XFOE0eBYti0EQPL5LkuggUZ4TZRqEV6UKK3A56krnExV8CZN0WtOFWRPK67VbszHACDbKXthnQ=="
-COSMOS_DB_NAME = "ChatbotDB"
-COSMOS_CONTAINER_SESSIONS = "Sessions"
-COSMOS_CONTAINER_KB = "KnowledgeBase"
-
-client = AzureOpenAI(api_key=AZURE_OPENAI_KEY,
-                     api_version="2024-08-01-preview",
-                     azure_endpoint=AZURE_OPENAI_ENDPOINT)
-
-cosmos_client = CosmosClient(url=COSMOS_ENDPOINT, credential=COSMOS_KEY)
-database = cosmos_client.create_database_if_not_exists(id=COSMOS_DB_NAME)
-session_container = database.create_container_if_not_exists(
-    id=COSMOS_CONTAINER_SESSIONS,
-    partition_key=PartitionKey(path="/session_id")
-)
-kb_container = database.create_container_if_not_exists(
-    id=COSMOS_CONTAINER_KB,
-    partition_key=PartitionKey(path="/doc_id")
+client = AzureOpenAI(
+    api_key=os.environ["AZURE_OPENAI_API_KEY"],
+    api_version=os.environ["OPENAI_API_VERSION"],
+    azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"]
 )
 
-# Helper functions
+# -----------------------------
+# 1️⃣ Paths setup
+# -----------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+INDEX_PATH = os.path.join(BASE_DIR, "faiss_index.index")
+DOC_NAMES_PATH = os.path.join(BASE_DIR, "doc_names.npy")
+DOCS_PATH = os.path.join(BASE_DIR, "docs.npy")
 
-def cosine_similarity(vec1, vec2):
-    dot = sum(a*b for a, b in zip(vec1, vec2))
-    norm1 = math.sqrt(sum(a*a for a in vec1))
-    norm2 = math.sqrt(sum(b*b for b in vec2))
-    if norm1 == 0 or norm2 == 0: return 0
-    return dot / (norm1 * norm2)
+# -----------------------------
+# 2️⃣ Verify files exist
+# -----------------------------
+for path in [INDEX_PATH, DOC_NAMES_PATH, DOCS_PATH]:
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"File not found: {path}")
 
-def retrieve_kb(user_input, top_k=3):
-    embedding_resp = client.embeddings.create(
-        model=AZURE_EMBEDDINGS_DEPLOYMENT_NAME,
-        input=user_input
-    )
-    query_vector = embedding_resp.data[0].embedding
-    docs = list(kb_container.read_all_items())
-    similarities = []
-    for doc in docs:
-        doc_vector = doc.get("embedding", [])
-        if doc_vector:
-            similarities.append((cosine_similarity(query_vector, doc_vector), doc["content"]))
-    top_docs = sorted(similarities, key=lambda x: x[0], reverse=True)[:top_k]
-    return "\n".join([doc for _, doc in top_docs])
+# -----------------------------
+# 3️⃣ Load FAISS index and documents
+# -----------------------------
+index = faiss.read_index(INDEX_PATH)
+doc_names = np.load(DOC_NAMES_PATH, allow_pickle=True)
+docs = np.load(DOCS_PATH, allow_pickle=True)
+print(f"Loaded FAISS index with {index.ntotal} vectors and {len(docs)} documents")
 
-def summarize_conversation(history):
-    if not history: return ""
-    messages = [{"role": "system", "content": "Summarize the following conversation briefly, keeping only important points:"}]
-    for msg in history:
-        messages.append({"role": "user", "content": msg["user_input"]})
-        messages.append({"role": "assistant", "content": msg["bot_response"]})
-    response = client.chat.completions.create(
-        model=AZURE_DEPLOYMENT_NAME,
-        messages=messages,
-        max_tokens=150
-    )
-    return response.choices[0].message.content
+# -----------------------------
+# 4️⃣ Load embedding model
+# -----------------------------
+model = SentenceTransformer('all-MiniLM-L6-v2')
 
-def count_tokens(messages, model="gpt-4o"):
-    encoding = tiktoken.encoding_for_model(model)
-    total_tokens = 0
-    for msg in messages:
-        for value in msg.values():
-            total_tokens += len(encoding.encode(str(value)))
-    return total_tokens
+# -----------------------------
+# 5️⃣ Prompt template for RAG
+# -----------------------------
+PROMPT_TEMPLATE = """
+You are an AI assistant. Only answer questions using the following documents:
+{documents}
 
-# Start session
-session_id = str(uuid.uuid4())
-print(f"\n✅ New session started: {session_id}")
-print("💬 Chatbot ready! Type 'exit', 'clear', or 'history'.")
-print("⏱️ Current UTC:", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z"))
+Question: {question}
 
-MAX_TOKENS = 3000  
+- If the question is unrelated to these documents, respond: "I cannot answer this question as it is out of scope."
+- Provide references using the document names.
+- Be concise and clear.
+"""
+
+# -----------------------------
+# 6️⃣ Search / retrieval functions
+# -----------------------------
+def retrieve_documents(query, k=3, threshold=0.5):
+    q_vec = np.array([model.encode(query)]).astype('float32')
+    D, I = index.search(q_vec, k)
+    results = []
+    for dist, idx in zip(D[0], I[0]):
+        similarity = 1 / (1 + dist)  # L2 to similarity
+        if similarity >= threshold:
+            results.append({
+                "document_name": doc_names[idx],
+                "text": docs[idx],
+                "similarity": round(similarity, 3)
+            })
+    return results
+
+def multi_topic_search(user_query, k=3, threshold=0.5):
+    topics = [t.strip() for t in user_query.lower().replace(",", " and ").split(" and ")]
+    combined_results = []
+    seen_docs = set()
+
+    for topic in topics:
+        # Exact match in names
+        exact_docs = [
+            {"document_name": doc_names[i], "text": docs[i], "similarity": 1.0}
+            for i in range(len(doc_names))
+            if topic in doc_names[i].lower()
+        ]
+
+        # Fuzzy match in names
+        if not exact_docs:
+            matches = difflib.get_close_matches(topic, [dn.lower() for dn in doc_names], n=3, cutoff=0.6)
+            exact_docs = [
+                {"document_name": doc_names[i], "text": docs[i], "similarity": 0.9}
+                for i, dn in enumerate(doc_names) if dn.lower() in matches
+            ]
+
+        # Fuzzy match in content
+        if not exact_docs:
+            matches = difflib.get_close_matches(topic, [d.lower()[:200] for d in docs], n=3, cutoff=0.6)
+            exact_docs = [
+                {"document_name": doc_names[i], "text": docs[i], "similarity": 0.85}
+                for i, d in enumerate(docs) if d.lower()[:200] in matches
+            ]
+
+        # Add results
+        for r in exact_docs:
+            if r['document_name'] not in seen_docs:
+                combined_results.append(r)
+                seen_docs.add(r['document_name'])
+
+        # Always fallback to FAISS if nothing matched
+        if not exact_docs:
+            results = retrieve_documents(topic, k, threshold)
+            for r in results:
+                if r['document_name'] not in seen_docs:
+                    combined_results.append(r)
+                    seen_docs.add(r['document_name'])
+
+    return combined_results
 
 
-# Main chat loop
+# -----------------------------
+# 7️⃣ Azure OpenAI answer generation
+# -----------------------------
+def generate_answer(prompt, max_tokens=500, temperature=0.2):
+    try:
+        response = client.chat.completions.create(
+            model=os.environ["AZURE_OPENAI_DEPLOYMENT"],
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens,
+            temperature=temperature
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Error generating answer: {e}"
 
-while True:
-    user_input = input("You: ")
+# -----------------------------
+# 8️⃣ Chatbot response
+# -----------------------------
+def chatbot_response(user_query):
+    # Search documents
+    results = multi_topic_search(user_query, k=3, threshold=0.6)
 
-    if user_input.lower() in ["exit", "quit"]:
-        print("👋 Goodbye!")
-        break
+    # ✅ If no documents found in FAISS
+    if not results:
+        # Use Azure OpenAI directly as a fallback
+        prompt = f"Translate or define this in Arabic: {user_query}"
+        answer = generate_answer(prompt, max_tokens=200)
+        return answer, []
 
-    if user_input.lower() == "clear":
-        session_id = str(uuid.uuid4())
-        print(f"🗑 Conversation cleared. New session started: {session_id}")
-        continue
+    # Build context and prompt if documents found
+    context_text = "\n\n".join([f"[{r['document_name']}] {r['text']}" for r in results])
+    prompt = PROMPT_TEMPLATE.format(documents=context_text, question=user_query)
 
-    if user_input.lower() == "history":
-        history = list(session_container.query_items(
-            query="SELECT * FROM c WHERE c.session_id=@sid ORDER BY c.timestamp ASC",
-            parameters=[{"name": "@sid", "value": session_id}],
-            enable_cross_partition_query=True
-        ))
-        if not history:
-            print("No conversation history yet.")
-        else:
-            print("📜 Conversation History:")
-            for msg in history:
-                print(f"You: {msg['user_input']}")
-                print(f"Bot: {msg['bot_response']}")
-        continue
+    # Generate answer using RAG
+    answer = generate_answer(prompt, max_tokens=500)
 
-    # Fetch previous conversation
-    history = list(session_container.query_items(
-        query="SELECT * FROM c WHERE c.session_id=@sid ORDER BY c.timestamp ASC",
-        parameters=[{"name": "@sid", "value": session_id}],
-        enable_cross_partition_query=True
-    ))
+    # Append references
+    references = [r['document_name'] for r in results]
+    answer_with_refs = f"{answer}\n\n[Reference: {', '.join(references)}]"
 
-    # Build messages with token-based context
+    return answer_with_refs, references
 
-    messages = [{"role": "system", "content": "You are a helpful assistant specialized in teaching."}]
-    kb_context = retrieve_kb(user_input)
-    if kb_context:
-        messages.append({"role": "system", "content": f"Use the following knowledge base info:\n{kb_context}"})
 
-    for msg in history:
-        user_msg = {"role": "user", "content": msg["user_input"]}
-        bot_msg = {"role": "assistant", "content": msg["bot_response"]}
-
-        temp_messages = messages + [user_msg, bot_msg]
-        temp_tokens = count_tokens(temp_messages, model=AZURE_DEPLOYMENT_NAME)
-
-        if temp_tokens > MAX_TOKENS:
-            summary_text = summarize_conversation(messages[1:])  
-            messages = [{"role": "system", "content": "Conversation summary:\n" + summary_text}]
+# -----------------------------
+# 9️⃣ Chatbot loop
+# -----------------------------
+if __name__ == "__main__":
+    print("Chatbot ready! Type 'exit' or 'quit' to stop.\n")
+    while True:
+        user_query = input("You: ").strip()
+        if user_query.lower() in ["exit", "quit"]:
+            print("Goodbye!")
             break
-        else:
-            messages.append(user_msg)
-            messages.append(bot_msg)
+        if not user_query:
+            continue
 
-    # Add current user input
-    messages.append({"role": "user", "content": user_input})
+        response, refs = chatbot_response(user_query)
+        print(f"\nChatbot:\n{response}\n")
 
-    # Get GPT response
-    response = client.chat.completions.create(
-        model=AZURE_DEPLOYMENT_NAME,
-        messages=messages,
-        max_tokens=300
-    )
-    reply = response.choices[0].message.content
-    print("Bot:", reply)
 
-    # Store conversation
-    session_container.upsert_item({
-        "id": str(uuid.uuid4()),
-        "session_id": session_id,
-        "user_input": user_input,
-        "bot_response": reply,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    })
+
