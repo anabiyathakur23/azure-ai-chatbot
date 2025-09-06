@@ -1,4 +1,3 @@
-
 # chatbot.py
 
 import os
@@ -7,6 +6,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from openai import AzureOpenAI
 import difflib
+from langdetect import detect
 
 # -----------------------------
 # 0️⃣ Azure OpenAI environment setup
@@ -43,7 +43,7 @@ for path in [INDEX_PATH, DOC_NAMES_PATH, DOCS_PATH]:
 index = faiss.read_index(INDEX_PATH)
 doc_names = np.load(DOC_NAMES_PATH, allow_pickle=True)
 docs = np.load(DOCS_PATH, allow_pickle=True)
-print(f"Loaded FAISS index with {index.ntotal} vectors and {len(docs)} documents")
+print(f"✅ Loaded FAISS index with {index.ntotal} vectors and {len(docs)} documents")
 
 # -----------------------------
 # 4️⃣ Load embedding model
@@ -126,7 +126,6 @@ def multi_topic_search(user_query, k=3, threshold=0.5):
 
     return combined_results
 
-
 # -----------------------------
 # 7️⃣ Azure OpenAI answer generation
 # -----------------------------
@@ -143,38 +142,59 @@ def generate_answer(prompt, max_tokens=500, temperature=0.2):
         return f"Error generating answer: {e}"
 
 # -----------------------------
-# 8️⃣ Chatbot response
+# 8️⃣ Chatbot response (Bilingual)
 # -----------------------------
+conversation_history = []
+
 def chatbot_response(user_query):
-    # Search documents
+    # Handle history & clear
+    if user_query.lower() == "history":
+        return "\n".join(conversation_history) if conversation_history else "No history yet.", []
+    if user_query.lower() == "clear":
+        conversation_history.clear()
+        return "Conversation history cleared.", []
+
+    # Detect language
+    try:
+        lang = detect(user_query)
+    except:
+        lang = "en"
+
     results = multi_topic_search(user_query, k=3, threshold=0.6)
 
-    # ✅ If no documents found in FAISS
+    # If no relevant docs, fallback to translation/definition
     if not results:
-        # Use Azure OpenAI directly as a fallback
-        prompt = f"Translate or define this in Arabic: {user_query}"
-        answer = generate_answer(prompt, max_tokens=200)
+        if lang == "ar":
+            prompt = f"Translate or define this in Arabic: {user_query}"
+        else:
+            prompt = f"Translate or define this in English: {user_query}"
+        answer = generate_answer(prompt)
+        conversation_history.append(f"You: {user_query}\nChatbot: {answer}")
         return answer, []
 
-    # Build context and prompt if documents found
+    # Build context for RAG
     context_text = "\n\n".join([f"[{r['document_name']}] {r['text']}" for r in results])
-    prompt = PROMPT_TEMPLATE.format(documents=context_text, question=user_query)
+    
+    if lang == "ar":
+        prompt = f"Answer this question in Arabic using the following documents:\n{context_text}\n\nQuestion: {user_query}"
+    else:
+        prompt = PROMPT_TEMPLATE.format(documents=context_text, question=user_query)
 
-    # Generate answer using RAG
     answer = generate_answer(prompt, max_tokens=500)
-
-    # Append references
     references = [r['document_name'] for r in results]
     answer_with_refs = f"{answer}\n\n[Reference: {', '.join(references)}]"
 
+    # Save to history
+    conversation_history.append(f"You: {user_query}\nChatbot: {answer_with_refs}")
     return answer_with_refs, references
-
 
 # -----------------------------
 # 9️⃣ Chatbot loop
 # -----------------------------
 if __name__ == "__main__":
-    print("Chatbot ready! Type 'exit' or 'quit' to stop.\n")
+    print("✅ Loaded FAISS index with", index.ntotal, "vectors")
+    print("✅ Chatbot ready! Type 'exit' or 'quit' to stop.\n")
+
     while True:
         user_query = input("You: ").strip()
         if user_query.lower() in ["exit", "quit"]:
@@ -185,6 +205,3 @@ if __name__ == "__main__":
 
         response, refs = chatbot_response(user_query)
         print(f"\nChatbot:\n{response}\n")
-
-
-
