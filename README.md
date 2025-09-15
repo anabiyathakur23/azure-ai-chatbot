@@ -7,13 +7,11 @@ A very simple command-line chatbot that uses **Azure OpenAI (GPT-4o)**.
 ```
 azure-ai-chatbot/
 ├─ chatbot/
-│  ├─ chatbot.py              # CLI chatbot with RAG and multi-lang support
-│  ├─ upload_embeddings.py    # Uploads documents from Azure Storage and builds FAISS index
+│  ├─ chatbot.py              # CLI chatbot with RAG, multi-lang, and speech support
+│  ├─ upload_embeddings.py    # Uploads documents and builds FAISS index
 ├─ docs/
 │  └─ architecture/
-│     ├─ architecture_v1.0.png  # Lab 2 architecture
-│     ├─ architecture_v1.1.png  # Lab 3 architecture (session + storage)
-│     ├─ architecture_lab4.png  # Lab 4 updated architecture (Document Intelligence + multi-lang)
+│     ├─ architecture_lab5.png  # Lab 5 updated architecture with speech services
 │     └─ architecture.md
 ├─ requirements.txt
 └─ README.md
@@ -23,10 +21,12 @@ azure-ai-chatbot/
 
 ## Prerequisites
 - Python 3.9+
+- Azure subscription with an **Azure OpenAI** resource (from Lab 1)
 - Azure subscription with:
 - Azure OpenAI resource (gpt-4o deployment)
-- Azure Blob Storage for document storage
-   - Optional: Azure Function App for hosting
+- Azure Blob Storage for documents
+- Azure Cognitive Speech Services (for speech-to-text & text-to-speech)
+- Optional: Azure Function App for deployment
 
 ## Setup
 1. Create and activate a virtual environment (optional but recommended)
@@ -40,14 +40,20 @@ azure-ai-chatbot/
      $env:AZURE_OPENAI_ENDPOINT="(https://anabi-meobtnsg-swedencentral.cognitiveservices.azure.com)"
      $env:AZURE_OPENAI_KEY="<my-api-key>"
      $env:AZURE_DEPLOYMENT_NAME="gpt-4o"
+     $env:COSMOSDB_URL="<your-cosmos-url>"
+     $env:COSMOSDB_KEY="<your-cosmos-key>"
 
      ```
-4. Upload documents to Azure Blob Storage (kb-docs container) if not already uploaded.
-5. Run upload_embeddings.py to download docs and create FAISS index:
-
+4. Upload documents to Azure Blob Storage (kb-docs container)
+5. Generate FAISS index:
 ```powershell
-python chatbot/upload_embeddings.py
-  ```
+   python chatbot/upload_embeddings.py
+```
+- Speak or type queries.
+- Chatbot responds via text and optionally via speech.
+- Type exit to quit.
+- Supports English and Arabic queries.
+- Can handle multi-topic queries using RAG.
 
 ## Run
 ```bash
@@ -55,22 +61,20 @@ python chatbot/chatbot.py
 ```
 
 Type `exit` to quit.
-Ask questions from your uploaded documents.
-Ask bilingual queries (English or Arabic).
-If a query is not in the documents, the bot will attempt to translate or define using Azure OpenAI.
+Type `clear` to reset session.
+Type `history` to view stored conversation
 
 
 ## Testing
--English: “Explain the rules of badminton”
-- Arabic: “ما هو شات بوت؟”
-- Multi-topic queries: “badminton and cricket”
-- Unknown queries: “What is chatbot?” → Fallback to translation/definition
+- Try greetings: "Hello", "Who are you?"
+- Ask for facts or definitions.
+- Try an empty message (should prompt you).
+- Disconnect internet or change deployment name to see error handling.
 
 ## Deliverables (for Lab 3)
-- /docs/architecture/architecture_lab4.png → Lab 4 updated architecture
-- chatbot/chatbot.py → CLI chatbot with RAG + multi-language support
-- chatbot/upload_embeddings.py → FAISS index creation and document embedding
+- Updated architecture diagram: /docs/architecture/architecture_lab5.png
+- RAG-enabled chatbot: chatbot/chatbot.py
+- Speech services integration: Azure Speech-to-Text & Text-to-Speech
 - FAISS index files: faiss_index.index, docs.npy, doc_names.npy
-- Multilingual document support: English + Arabic .txt files in Azure Storage
-- Public GitHub repo: azure-ai-chatbot
-
+- Deployed code to Azure Function App
+- Optional bonus: Chatbot frontend (web or mobile)
