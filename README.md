@@ -87,7 +87,7 @@ Type `history` to view stored conversation
 - Try an empty message (should prompt you).
 - Disconnect internet or change deployment name to see error handling.
 
-## Deliverables (for Lab 5)
+## Deliverables (for Lab 6)
 - Updated architecture diagram: /docs/architecture/architecture_lab5.png
 - RAG-enabled chatbot: chatbot/chatbot.py
 - Speech services integration: Azure Speech-to-Text & Text-to-Speech
