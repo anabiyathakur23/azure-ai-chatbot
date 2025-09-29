@@ -7,14 +7,15 @@ A very simple command-line chatbot that uses **Azure OpenAI (GPT-4o)**.
 ```
 azure-ai-chatbot/
 ├─ chatbot/
-│  ├─ chatbot.py              # CLI chatbot with RAG, multi-lang, and speech support
+│  ├─ chatbot.py              # CLI chatbot with RAG, multi-lang, speech, and function calling
 │  ├─ upload_embeddings.py    # Uploads documents and builds FAISS index
 ├─ docs/
 │  └─ architecture/
-│     ├─ architecture_lab5.png  # Lab 5 updated architecture with speech services
+│     ├─ architecture_lab5.png  # Updated architecture with speech services
 │     └─ architecture.md
 ├─ requirements.txt
 └─ README.md
+
 
 
 ```
@@ -51,7 +52,7 @@ azure-ai-chatbot/
  ```powershell
  az keyvault secret set --vault-name <your-keyvault-name> --name "openaikey" --value "<your-openai-key>"
 ```
-   ***In backend.py or chatbot.py, fetch it using DefaultAzureCredential or AzureCliCredential:***
+   ***Fetch secrets in chatbot.py using DefaultAzureCredential:**
 ```
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
@@ -66,33 +67,64 @@ openai.api_key = client.get_secret("openaikey").value
 ```powershell
    python chatbot/upload_embeddings.py
 ```
-- Speak or type queries.
-- Chatbot responds via text and optionally via speech.
-- Type exit to quit.
+
+Features
+
+1. Text & Voice Queries
+- Type in the CLI or speak using microphone (*voice* command).
+- Chatbot responds via text and optional speech (*speak on/off*).
+
+2. RAG Retrieval
+- Chatbot searches uploaded documents for relevant answers.
+- Responses include document references.
+- If no context is found: *"I cannot answer this question as it is out of scope."*
+
+3. Function Calling
+   Supports the following callable functions:
+        - **get_weather(city)** – Current weather for a city
+        - **get_time()** – Current date and time
+        - **calculate(expression)** – Evaluate math expressions
+        - **fun_fact()** – Returns a fun fact
+
+4. OCR & Document Support
+- Handles .txt, .docx, .odt, .pdf, and image files (.png, .jpg, .jpeg, .bmp, .tiff).
+- Uses Azure Computer Vision for text extraction.
+
+5. Image Queries
+- Ask about uploaded images (show, display, photo, etc.).
+- Returns a URL to the image file.
+
+6. Multi-Language Support
 - Supports English and Arabic queries.
-- Can handle multi-topic queries using RAG.
+
+7. Conversation Management
+- **history** – Shows conversation history
+- **clear** – Clears conversation
+- **exit or quit** – Exit chatbot
 
 ## Run
 ```bash
 python chatbot/chatbot.py
 ```
 
-Type `exit` to quit.
-Type `clear` to reset session.
-Type `history` to view stored conversation
-
+**CLI commands:**
+- exit / quit
+- voice – Speak input
+- speak on / speak off
+- history – View conversation
+- clear – Reset session
 
 ## Testing
 - Try greetings: "Hello", "Who are you?"
-- Ask for facts or definitions.
-- Try an empty message (should prompt you).
-- Disconnect internet or change deployment name to see error handling.
+- Ask functions: *"What's the weather in Doha?", "calculate 23*5", "tell me a fun fact"*
+- Query documents or images in uploads/.
+- Try an unsupported query to see "out of scope" response.
 
 ## Deliverables (for Lab 6)
 - Updated architecture diagram: /docs/architecture/architecture_lab5.png
 - RAG-enabled chatbot: chatbot/chatbot.py
-- Speech services integration: Azure Speech-to-Text & Text-to-Speech
+- Function calling and Speech services integration: Azure Speech-to-Text & Text-to-Speech
 - FAISS index files: faiss_index.index, docs.npy, doc_names.npy
-- Deployed code to Azure Function App
+- Auto-indexing for uploaded files
 - deployed key vault
-- Optional bonus: Chatbot frontend (web or mobile)
+-  Chatbot frontend
